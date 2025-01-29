@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         finfo_close($finfo);
 
         if (!isset(ALLOWED_TYPES[$mimeType])) {
-            throw new Exception('Invalid file type: '.$mimeType, 400);
+            throw new Exception('Invalid file type', 400);
         }
 
         // 生成文件路径
@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>pngs.Link</title>
+    <title>WebDAV Image Uploader</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 2em auto; padding: 0 1em; }
         form { margin: 2em 0; }
