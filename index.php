@@ -24,37 +24,55 @@ function validateToken(): bool {
 if (isset($_GET['f'])) {
     try {
         $file = $_GET['f'];
-        
+
         // 安全检查：防止目录遍历和非法访问
         if (strpos($file, '..') !== false || 
             !preg_match('/^\/uploads\/\d{4}\/\d{2}\/\d{2}\/[a-f0-9]{64}\.(jpg|png|gif|webp)$/', $file)) {
             throw new Exception('Invalid file path', 400);
         }
 
-        // 获取文件扩展名并设置对应的Content-Type
-        $ext = pathinfo($file, PATHINFO_EXTENSION);
-        $contentType = array_search($ext, ALLOWED_TYPES);
+        // 使用 basename() 来避免路径注入
+        $fileName = basename($file);
+
+        // 获取文件扩展名并设置对应的 Content-Type
+        $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+        $allowedTypes = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'];
         
-        if ($contentType === false) {
+        if (!array_key_exists($ext, $allowedTypes)) {
             throw new Exception('Invalid file type', 400);
         }
 
         // 获取图片内容
         $imageContent = $webdav->getFile($file);
-        
+
+        if ($imageContent === false) {
+            throw new Exception('File not found or cannot be read', 404);
+        }
+
+        // 使用文件的实际 MIME 类型，增强安全性
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $imageContent);
+        finfo_close($finfo);
+
+        if ($mimeType !== $allowedTypes[$ext]) {
+            throw new Exception('MIME type mismatch', 400);
+        }
+
         // 设置缓存控制头（1年）
         $expiresTime = time() + CACHE_DURATION;
         header('Cache-Control: public, max-age=' . CACHE_DURATION);
         header('Expires: ' . gmdate('D, d M Y H:i:s', $expiresTime) . ' GMT');
         header('Last-Modified: ' . gmdate('D, d M Y H:i:s', time()) . ' GMT');
         header('ETag: "' . md5($imageContent) . '"');
-        header('Content-Type: ' . $contentType);
+        header('Content-Type: ' . $allowedTypes[$ext]);
         header('Content-Length: ' . strlen($imageContent));
         
         echo $imageContent;
         exit;
-        
+
     } catch (Exception $e) {
+        // 错误处理和日志记录
+        error_log($e->getMessage());  // 在服务器日志中记录错误
         http_response_code($e->getCode() ?: 500);
         header('Content-Type: application/json');
         echo json_encode(['error' => $e->getMessage()]);
